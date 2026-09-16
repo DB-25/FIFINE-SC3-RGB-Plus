@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
+using SC3RGBController.Models;
+using SC3RGBController.Services;
 
 namespace SC3RGBController;
 
@@ -13,6 +15,9 @@ public partial class App : Application
     private Mutex? _instanceMutex;
     private EventWaitHandle? _activationEvent;
     private CancellationTokenSource? _activationCancellation;
+    private StartupBackgroundHost? _backgroundHost;
+    private SystemTrayService? _startupTray;
+    private TrayCommandRouter? _startupTrayCommands;
 
     private void Application_Startup(object sender, StartupEventArgs e)
     {
@@ -43,6 +48,16 @@ public partial class App : Application
         _activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ActivationEventName);
         _activationCancellation = new CancellationTokenSource();
         _ = Task.Run(() => WatchForActivation(_activationCancellation.Token));
+
+        bool startupLaunch = e.Args.Any(argument => string.Equals(argument, "--startup", StringComparison.OrdinalIgnoreCase));
+        if (startupLaunch)
+        {
+            StartBackgroundSession();
+        }
+        else
+        {
+            Dispatcher.BeginInvoke(new Action(async () => await OpenMainWindowAsync()));
+        }
     }
 
     private void WatchForActivation(CancellationToken cancellationToken)
@@ -66,8 +81,70 @@ public partial class App : Application
             {
                 if (MainWindow is MainWindow window)
                     await window.OpenFromExternalLaunchAsync();
+                else
+                    await OpenMainWindowAsync();
             }));
         }
+    }
+
+    private void StartBackgroundSession()
+    {
+        AppSettings settings = SettingsStore.Load();
+        bool restoreStockMode = settings.CustomShortcutsEnabled &&
+            !CustomShortcutStabilityPolicy.EventDrivenTransportEnabled;
+        if (restoreStockMode)
+        {
+            settings.CustomShortcutsEnabled = false;
+            SettingsStore.Save(settings);
+        }
+
+        _backgroundHost = new StartupBackgroundHost(settings, restoreStockMode);
+        _backgroundHost.Start();
+
+        _startupTrayCommands = new TrayCommandRouter();
+        _startupTrayCommands.OpenRequested += async (_, _) => await OpenMainWindowAsync();
+        _startupTrayCommands.DisableShortcutsRequested += async (_, _) => await DisableBackgroundShortcutsAsync(settings);
+        _startupTrayCommands.ExitRequested += async (_, _) => await ExitBackgroundSessionAsync();
+        _startupTray = new SystemTrayService(_startupTrayCommands);
+        _startupTray.Show();
+    }
+
+    private async Task OpenMainWindowAsync()
+    {
+        if (MainWindow is MainWindow existing)
+        {
+            await existing.OpenFromExternalLaunchAsync();
+            return;
+        }
+
+        await StopBackgroundSessionAsync();
+        MainWindow window = new(isStartupLaunch: false);
+        MainWindow = window;
+        window.Show();
+    }
+
+    private async Task DisableBackgroundShortcutsAsync(AppSettings settings)
+    {
+        settings.CustomShortcutsEnabled = false;
+        SettingsStore.Save(settings);
+        if (_backgroundHost is not null)
+            await _backgroundHost.DisableShortcutsAsync();
+    }
+
+    private async Task ExitBackgroundSessionAsync()
+    {
+        await StopBackgroundSessionAsync();
+        Shutdown();
+    }
+
+    private async Task StopBackgroundSessionAsync()
+    {
+        SystemTrayService? tray = _startupTray;
+        _startupTray = null;
+        tray?.Dispose();
+        StartupBackgroundHost? host = _backgroundHost;
+        _backgroundHost = null;
+        if (host is not null) await host.DisposeAsync();
     }
 
     private void Application_SessionEnding(object sender, SessionEndingCancelEventArgs e)
@@ -77,6 +154,7 @@ public partial class App : Application
 
     private void Application_Exit(object sender, ExitEventArgs e)
     {
+        StopBackgroundSessionAsync().GetAwaiter().GetResult();
         _activationCancellation?.Cancel();
         try { _activationEvent?.Set(); } catch (ObjectDisposedException) { }
         _activationEvent?.Dispose();

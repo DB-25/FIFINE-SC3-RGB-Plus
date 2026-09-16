@@ -1,23 +1,18 @@
-# FIFINE SC3 RGB+ v2.5.0
+# FIFINE SC3 RGB+ v2.5.1
 
-Stable update adding Custom Button Shortcuts and RGB+ Firmware 1.5 support.
+Stable reliability update for Custom Button Shortcuts and background startup.
 
-- Assign Custom A, B, C, and D to Windows `.exe` or `.lnk` applications
-- One application launch per physical button press, with hold/repeat de-duplication
-- Shortcut Mode suppresses the original SC3 Custom-button action and sound while enabled
-- New **Settings → Custom Buttons** page with an explicit Stock/Shortcut toggle
-- Background shortcut engine continues working when the main window is hidden
-- Windows system tray actions for Open, Disable Custom Button Shortcuts, and Exit
-- RGB+ Firmware 1.5 support with automatic firmware-version detection
-- New **Settings → Updates → Mixer Firmware** section with explicit user-confirmed firmware updates
-- Direct RGB+ Firmware 1.4 → 1.5 migration
-- Direct supported Stock V22 → RGB+ Firmware 1.5 installation
-- Already-current Firmware 1.5 devices are detected and are not reflashed
+- Fixes intermittent full-mixer and audio freezes caused by continuous FC/02 polling
+- Moves Custom A/B/C/D shortcuts to event-driven MI_03 interrupt reports
+- Keeps shortcut enable/disable, sound suppression, tray operation, and one launch per press
+- Applies saved lighting automatically at Windows startup without opening the main window
+- Restores saved lighting once after a real SC3 reconnect
+- Includes the physically validated CBTN v4 RGB+ Firmware 1.5 package
 
-Mixer firmware updates never run silently. Custom Button Shortcuts remain unavailable until a verified RGB+ Firmware 1.5 device with CBTN v2 is connected.
+Mixer firmware updates never run silently. Custom Button Shortcuts remain unavailable until a verified RGB+ Firmware 1.5 device with the CBTN v4 event transport is connected. Button events use MI_03 interrupt input and do not continuously poll FC/02.
 
 Production Mod 1.5 package SHA-256:
-`589B2FCB590B999C905693DF6ABA6A343343AC6A8241B4AA9802853A72FA525B`
+`02DACD0F2692E4EA064647378718047DED3C197081B53A26A95A0E8BDF6F9ACF`
 
 Production Mod 1.5 package CRC16:
-`C12C`
+`FB45`

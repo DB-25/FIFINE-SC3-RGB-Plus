@@ -72,13 +72,22 @@ public partial class MainWindow : Window
     private bool _backgroundMode;
     private bool _allowWindowClose;
     private bool _exitInProgress;
-    private readonly bool _isStartupLaunch = Environment.GetCommandLineArgs()
-        .Any(argument => string.Equals(argument, "--startup", StringComparison.OrdinalIgnoreCase));
+    private readonly bool _isStartupLaunch;
+    private bool _restoreStockModeForStability;
 
-    public MainWindow()
+    public MainWindow(bool? isStartupLaunch = null)
     {
+        _isStartupLaunch = isStartupLaunch ?? Environment.GetCommandLineArgs()
+            .Any(argument => string.Equals(argument, "--startup", StringComparison.OrdinalIgnoreCase));
         InitializeComponent();
         _settings = SettingsStore.Load();
+        _restoreStockModeForStability = _settings.CustomShortcutsEnabled &&
+            !CustomShortcutStabilityPolicy.EventDrivenTransportEnabled;
+        if (_restoreStockModeForStability)
+        {
+            _settings.CustomShortcutsEnabled = false;
+            SettingsStore.Save(_settings);
+        }
         UpdateStartupRegistration();
         AppVersionText.Text = $"App: {AppVersionInfo.Current}";
         IntegratedSettingsView.ConfigureUpdates(AppVersionInfo.DisplayVersion, _settings.AutomaticallyCheckForUpdates);
@@ -687,6 +696,12 @@ public partial class MainWindow : Window
                 ApplySelectedColor();
         }
 
+        if (connected && _firmwareFlavor == Sc3FirmwareFlavor.Mod15 && _restoreStockModeForStability)
+        {
+            _hid.TrySetCustomButtonMode(false, out _);
+            _restoreStockModeForStability = false;
+        }
+
         if (connected && _firmwareFlavor == Sc3FirmwareFlavor.Mod15 &&
             _customButtons.DesiredEnabled && !_customButtons.IsActive)
         {
@@ -746,18 +761,21 @@ public partial class MainWindow : Window
             _finalMod15Capability);
         IntegratedSettingsView.SetMixerFirmwarePresentation(presentation);
 
-        string requirement = !connected
+        bool eventTransportAvailable = CustomShortcutStabilityPolicy.EventDrivenTransportEnabled;
+        string requirement = presentation.CustomButtonsAvailable && !eventTransportAvailable
+            ? CustomShortcutStabilityPolicy.Message
+            : !connected
             ? "Connect your SC3 to verify Firmware 1.5 before enabling Custom Button Shortcuts."
             : _firmwareFlavor switch
             {
                 Sc3FirmwareFlavor.Mod14 => "Firmware 1.5 is required for Custom Button Shortcuts. Your existing RGB+ 1.4 features remain available until you update.",
                 Sc3FirmwareFlavor.Stock => "Firmware 1.5 is required for Custom Button Shortcuts. Install RGB+ Firmware 1.5 from Updates.",
                 Sc3FirmwareFlavor.DiagnosticMod14 => "Production RGB+ Firmware 1.5 is required before Custom Button Shortcuts can be enabled.",
-                Sc3FirmwareFlavor.Mod15 when !_finalMod15Capability => "Firmware 1.5 was detected, but CBTN v2 could not be verified.",
+                Sc3FirmwareFlavor.Mod15 when !_finalMod15Capability => "Install the event-driven Firmware 1.5 update to use Custom Button Shortcuts without continuous USB polling.",
                 _ => "Custom Button Shortcuts require a verified RGB+ Firmware 1.5 device."
             };
         IntegratedSettingsView.SetCustomFirmwareAvailability(
-            presentation.CustomButtonsAvailable,
+            presentation.CustomButtonsAvailable && eventTransportAvailable,
             _settings.CustomShortcutsEnabled,
             requirement);
     }
@@ -1474,56 +1492,19 @@ public partial class MainWindow : Window
 
     private Color GetEffectColor(DateTime now)
     {
-        Color baseColor;
-        LightingEffect effect;
+        SavedLightingState state;
         DateTime startedAt;
-        int speed;
         lock (_colorGate)
         {
-            baseColor = _selectedColor;
-            effect = _selectedEffect;
             startedAt = _effectStartedAt;
-            speed = GetEffectSpeed(effect);
+            state = new SavedLightingState(
+                _selectedColor,
+                CurrentBrightness,
+                _settings.IsLightingEnabled,
+                _selectedEffect,
+                GetEffectSpeed(_selectedEffect));
         }
-
-        if (!_settings.IsLightingEnabled) return Colors.Black;
-
-        double brightness = Math.Clamp(_settings.Brightness, 0, 100) / 100.0;
-        double cycle = (now - startedAt).TotalSeconds * EffectSpeedPolicy.CyclesPerSecond(effect, speed);
-        Color effectColor = baseColor;
-        double level = 1;
-
-        switch (effect)
-        {
-            case LightingEffect.Static:
-                break;
-            case LightingEffect.Breathing:
-                level = 0.16 + 0.84 * (0.5 + 0.5 * Math.Sin(cycle * Math.PI * 2));
-                break;
-            case LightingEffect.Rainbow:
-                effectColor = HsvColorPicker.ColorFromHsv(cycle * 360, 1, 1);
-                break;
-            case LightingEffect.Pulse:
-                level = 0.12 + 0.88 * Math.Pow(0.5 + 0.5 * Math.Sin(cycle * Math.PI * 2), 4);
-                break;
-            case LightingEffect.ColorCycle:
-                (double hue, double saturation, double value) = HsvColorPicker.RgbToHsv(baseColor);
-                Color[] palette =
-                [
-                    baseColor,
-                    HsvColorPicker.ColorFromHsv(hue + 120, Math.Max(saturation, 0.85), Math.Max(value, 0.85)),
-                    HsvColorPicker.ColorFromHsv(hue + 240, Math.Max(saturation, 0.85), Math.Max(value, 0.85))
-                ];
-                double position = cycle % palette.Length;
-                if (position < 0) position += palette.Length;
-                int index = (int)Math.Floor(position);
-                double transition = position - index;
-                transition = transition * transition * (3 - 2 * transition);
-                effectColor = BlendColors(palette[index], palette[(index + 1) % palette.Length], transition);
-                break;
-        }
-
-        return ScaleColor(effectColor, brightness * level);
+        return state.GetOutput(startedAt, now);
     }
 
     private static LightingEffect ParseLightingEffect(string? value) =>
@@ -1549,16 +1530,6 @@ public partial class MainWindow : Window
             case LightingEffect.ColorCycle: _settings.ColorCycleSpeed = speed; break;
         }
     }
-
-    private static Color BlendColors(Color first, Color second, double amount) => Color.FromRgb(
-        (byte)Math.Round(first.R + (second.R - first.R) * amount),
-        (byte)Math.Round(first.G + (second.G - first.G) * amount),
-        (byte)Math.Round(first.B + (second.B - first.B) * amount));
-
-    private static Color ScaleColor(Color color, double amount) => Color.FromRgb(
-        (byte)Math.Clamp((int)Math.Round(color.R * amount), 0, 255),
-        (byte)Math.Clamp((int)Math.Round(color.G * amount), 0, 255),
-        (byte)Math.Clamp((int)Math.Round(color.B * amount), 0, 255));
 
     // UI-only layered preview: base hardware remains untouched while the separate
     // lighting and glow masks receive the selected base colour and visual intensity.

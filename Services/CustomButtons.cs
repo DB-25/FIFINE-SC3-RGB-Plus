@@ -13,12 +13,12 @@ public sealed record Sc3QueryReply(
     byte RuntimeMode)
 {
     public bool SupportsFinalCustomShortcuts =>
-        Firmware == Sc3FirmwareFlavor.Mod15 && CbtnPresent && CbtnVersion == 2;
+        Firmware == Sc3FirmwareFlavor.Mod15 && CbtnPresent && CbtnVersion == 4;
 
     public static bool TryParse(byte[] report, out Sc3QueryReply reply)
     {
         reply = new(Sc3FirmwareFlavor.Unknown, false, false, 0, 0, 0, 0);
-        if (report is null || report.Length != HidDeviceClient.ExpectedInputLength || report[0] != 0)
+        if (report is null || report.Length < 0x1A || report[0] != 0)
             return false;
 
         ReadOnlySpan<byte> payload = report.AsSpan(1);
@@ -105,12 +105,37 @@ public static class CustomShortcutStatusPolicy
     };
 }
 
+public static class CustomShortcutStabilityPolicy
+{
+    // CBTN v4 delivers releases over the existing MI_03 interrupt IN endpoint. The shortcut engine
+    // never performs recurring FC/02 control GET_REPORT transactions.
+    public const bool EventDrivenTransportEnabled = true;
+    public const string Message =
+        "Custom Button Shortcuts require the event-driven RGB+ Firmware 1.5 update.";
+}
+
 public sealed class CustomButtonEventTracker
 {
     private ushort? _baseline;
+    private bool _acceptFirst;
 
-    public void Reset() => _baseline = null;
-    public void SetBaseline(ushort counter) => _baseline = counter;
+    public void Reset()
+    {
+        _baseline = null;
+        _acceptFirst = false;
+    }
+
+    public void SetBaseline(ushort counter)
+    {
+        _baseline = counter;
+        _acceptFirst = false;
+    }
+
+    public void ArmForInterruptEvents()
+    {
+        _baseline = null;
+        _acceptFirst = true;
+    }
 
     public bool TryAccept(byte keyId, ushort counter, out CustomButtonId button)
     {
@@ -118,7 +143,7 @@ public sealed class CustomButtonEventTracker
         if (_baseline is null)
         {
             _baseline = counter;
-            return false;
+            return _acceptFirst && TryMapKey(keyId, out button);
         }
         if (_baseline.Value == counter)
             return false;

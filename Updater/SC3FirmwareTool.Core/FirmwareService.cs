@@ -533,8 +533,10 @@ public sealed class FirmwareService
     private static string QueryOfficialVersion(HidIdentity identity)
     {
         using HidConnection connection = new(identity); connection.Write(Pad(Convert.FromHexString("A55A000016")));
-        byte[] response = connection.Read(); byte[] expected = Pad(Convert.FromHexString("A55A00073100010101210516"));
-        if (!response.SequenceEqual(expected)) throw new FirmwareUpdateException("Official version response mismatch.");
+        byte[] response = connection.Read(); byte[] expected = Convert.FromHexString("A55A00073100010101210516");
+        if (response.Length < expected.Length || !response.AsSpan(0, expected.Length).SequenceEqual(expected) ||
+            response.AsSpan(expected.Length).IndexOfAnyExcept((byte)0) >= 0)
+            throw new FirmwareUpdateException("Official version response mismatch.");
         return ReleasePolicy.OfficialVersion;
     }
     private static FirmwareIdentity QueryFirmwareIdentity(HidIdentity identity)

@@ -1,6 +1,6 @@
 using SC3FirmwareTool.Core;
 
-string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+string root = FindRepoRoot();
 string firmware = Path.Combine(root, "firmware", "candidates", "mod15", ReleasePolicy.FirmwareFileName);
 MvaPackage package = MvaPackage.LoadApproved(firmware);
 var plan = ProtocolPlan.Build(package);
@@ -188,3 +188,18 @@ FirmwareIdentity invalidCurrentIdentity = FirmwareIdentityPolicy.ParseAttestatio
 Require(invalidCurrentIdentity.Flavor == InstalledFirmwareFlavor.Mod15 && !invalidCurrentIdentity.IsProductionCurrent && !FirmwareIdentityPolicy.NeedsProductionInstall(invalidCurrentIdentity), "22 unverified Mod 1.5 must fail closed instead of reflashing");
 
 Console.WriteLine("PASS: firmware identity migration/skip policy checks 19-22");Console.WriteLine("PASS: Restore Original Firmware tests 1-18 + current Mod 1.5 updater regression");
+
+static string FindRepoRoot()
+{
+    foreach (string seed in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+    {
+        DirectoryInfo? current = new(seed);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "SC3RGBController.csproj")))
+                return current.FullName;
+            current = current.Parent;
+        }
+    }
+    throw new DirectoryNotFoundException("FIFINE SC3 RGB+ repository root was not found.");
+}

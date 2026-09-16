@@ -23,11 +23,17 @@ var tests = new (string Name, Func<Task> Run)[]
     ("diagnostic firmware cannot enter final shortcut mode", DiagnosticRejected),
     ("protocol is query + explicit enable/disable", ProtocolBytes),
     ("Mod 1.5 candidate verification", Mod15CandidateVerification),
-    ("final Firmware 1.5 sound-suppression build lock", FinalSoundSuppressionFirmwareLock),
+    ("final Firmware 1.5 event-driven build lock", FinalEventDrivenFirmwareLock),
     ("firmware update presentation policy", FirmwareUpdatePresentationPolicy),
     ("RGB transport regression", RgbRegression),
     ("Effect Speed regression", EffectSpeedRegression),
-    ("startup policy keeps background registered when shortcuts ON", StartupPolicy)
+    ("saved lighting state restores without a MainWindow", SavedLightingStateRestore),
+    ("background lighting retries and restores once per connection", BackgroundLightingReconnectRestore),
+    ("startup policy keeps background registered when shortcuts ON", StartupPolicy),
+    ("production controller blocks unavailable event transport", ProductionPollingSafetyGuard),
+    ("stability policy requires event-driven transport", StabilityPolicy),
+    ("MI_03 event profile is distinct from MI_04 control", EventInterfaceProfile),
+    ("shortcut session uses interrupt events without FC/02 polling", EventDrivenShortcuts)
 };
 
 foreach (var test in tests)
@@ -55,7 +61,7 @@ static async Task ToggleOffRestoresStock()
     await controller.SetPreferenceAsync(true);
     await WaitUntil(() => controller.IsActive);
     await controller.SetPreferenceAsync(false);
-    Require(transport.OffWrites == 1, "toggle OFF must send STOCK command");
+    Require(transport.OffWrites == 2, "session pre-clear and toggle OFF must each send STOCK once");
     Require(!controller.IsActive && !controller.IsRunning, "controller remained active after OFF");
 }
 
@@ -67,7 +73,7 @@ static async Task CloseWhileOnDoesNotDisable()
     await WaitUntil(() => controller.IsActive);
     Require(CustomShortcutHostPolicy.KeepRunningOnWindowClose(true), "close policy must hide rather than terminate when ON");
     await Task.Delay(60);
-    Require(transport.OffWrites == 0, "normal close policy sent OFF");
+    Require(transport.OffWrites == 1, "normal close sent an extra OFF after the session pre-clear");
     Require(controller.IsActive, "normal close policy stopped shortcut session");
 }
 
@@ -85,7 +91,7 @@ static async Task CloseKeepsEngineRunning()
 static async Task BackgroundLaunchesAllButtons()
 {
     var transport = FakeTransport.WithSequence(
-        Reply(0, 10, 0), Reply(0, 10, 1),
+        Reply(0, 10, 0),
         Reply(19, 11, 1), Reply(19, 11, 1),
         Reply(12, 12, 1), Reply(18, 13, 1), Reply(13, 14, 1));
     var launcher = new FakeLauncher();
@@ -117,7 +123,7 @@ static async Task ToggleOffAfterReopen()
     await WaitUntil(() => controller.IsActive);
     reopened.CustomShortcutsEnabled = false;
     await controller.SetPreferenceAsync(false);
-    Require(transport.OffWrites == 1 && !controller.IsActive, "OFF after reopen did not restore STOCK");
+    Require(transport.OffWrites == 2 && !controller.IsActive, "OFF after reopen did not restore STOCK");
 }
 
 static Task TrayOpenWorks()
@@ -150,7 +156,7 @@ static async Task TrayExitWorks()
     Require(exitRequested, "tray Exit did not route");
 
     await controller.StopAsync(sendOff: true);
-    Require(!controller.IsRunning && !controller.IsActive && transport.OffWrites == 1, "tray Exit cleanup did not stop background engine cleanly");
+    Require(!controller.IsRunning && !controller.IsActive && transport.OffWrites == 2, "tray Exit cleanup did not stop background engine cleanly");
 }
 
 static Task PersistedOnSurvivesRestart()
@@ -213,6 +219,9 @@ static Task CounterBehavior()
     Require(tracker.TryAccept(19, 0, out var button) && button == CustomButtonId.A, "counter wrap not accepted");
     Require(!tracker.TryAccept(19, 0, out _), "duplicate counter was emitted twice");
     tracker.SetBaseline(77); Require(!tracker.TryAccept(19, 77, out _), "baseline stale event launched");
+    tracker.ArmForInterruptEvents();
+    Require(tracker.TryAccept(12, 78, out var first) && first == CustomButtonId.B,
+        "first clean interrupt event was not accepted");
     return Task.CompletedTask;
 }
 
@@ -235,20 +244,38 @@ static Task ProtocolBytes()
 
 static Task Mod15CandidateVerification()
 {
-    string repo = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+    string repo = FindRepoRoot();
     string candidate = Path.Combine(repo, "firmware", "candidates", "mod15", Mod15CandidatePolicy.FirmwareFileName);
     MvaPackage package = MvaPackage.LoadMod15Candidate(candidate);
-    Require(package.Sha256 == "589b2fcb590b999c905693df6aba6a343343ac6a8241b4aa9802853a72fa525b", "updated Mod 1.5 SHA mismatch");
+    Require(package.Sha256 == "02dacd0f2692e4ea064647378718047ded3c197081b53a26a95a0e8bdf6f9acf", "updated Mod 1.5 SHA mismatch");
     Require(package.Data.LongLength == Mod15CandidatePolicy.FirmwareSize, "Mod 1.5 size mismatch");
     return Task.CompletedTask;
 }
 
-static Task FinalSoundSuppressionFirmwareLock()
+static string FindRepoRoot()
 {
-    const string finalSha = "589b2fcb590b999c905693df6aba6a343343ac6a8241b4aa9802853a72fa525b";
+    foreach (string seed in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+    {
+        DirectoryInfo? current = new(seed);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "SC3RGBController.csproj")))
+                return current.FullName;
+            current = current.Parent;
+        }
+    }
+    throw new DirectoryNotFoundException("FIFINE SC3 RGB+ repository root was not found.");
+}
+
+static Task FinalEventDrivenFirmwareLock()
+{
+    const string finalSha = "02dacd0f2692e4ea064647378718047ded3c197081b53a26a95a0e8bdf6f9acf";
+    const string pollingSha = "589b2fcb590b999c905693df6aba6a343343ac6a8241b4aa9802853a72fa525b";
     const string retiredSha = "8f3c5f56770b9e822481bebf9fa303857dd8324eff53c1cd2eca8969ddd384a4";
-    Require(ReleasePolicy.FirmwareSha256 == finalSha, "production policy no longer locks the physically validated sound-suppression firmware");
-    Require(ReleasePolicy.FirmwareCrc16 == 0xC12C, "production firmware CRC lock changed");
+    Require(ReleasePolicy.FirmwareSha256 == finalSha, "production policy no longer locks the physically validated event-driven firmware");
+    Require(ReleasePolicy.FirmwareCrc16 == 0xFB45, "production firmware CRC lock changed");
+    Require(ReleasePolicy.CbtnVersion == 4, "production CBTN capability is not event-driven v4");
+    Require(ReleasePolicy.FirmwareSha256 != pollingSha, "polling-only firmware became production again");
     Require(ReleasePolicy.FirmwareSha256 != retiredSha, "retired pre-sound-fix firmware became production again");
     return Task.CompletedTask;
 }
@@ -282,6 +309,42 @@ static Task EffectSpeedRegression()
     return Task.CompletedTask;
 }
 
+static Task SavedLightingStateRestore()
+{
+    AppSettings staticSettings = new() { LastHex = "#804020", Brightness = 50, Effect = "Static", IsLightingEnabled = true };
+    SavedLightingState staticState = SavedLightingState.From(staticSettings);
+    var output = staticState.GetOutput(DateTime.UnixEpoch, DateTime.UnixEpoch);
+    Require(output.R == 64 && output.G == 32 && output.B == 16, "static color or brightness did not restore");
+
+    foreach (LightingEffect effect in new[] { LightingEffect.Breathing, LightingEffect.Rainbow, LightingEffect.Pulse, LightingEffect.ColorCycle })
+    {
+        AppSettings settings = new() { LastHex = "#4080C0", Brightness = 77, Effect = effect.ToString(), IsLightingEnabled = true };
+        SavedLightingState state = SavedLightingState.From(settings);
+        var effectOutput = state.GetOutput(DateTime.UnixEpoch, DateTime.UnixEpoch.AddMilliseconds(700));
+        Require(effectOutput != System.Windows.Media.Colors.Black, $"{effect} did not restore a visible output");
+    }
+
+    SavedLightingState off = SavedLightingState.From(new AppSettings { IsLightingEnabled = false, Effect = "Rainbow", Brightness = 100 });
+    Require(off.GetOutput(DateTime.UnixEpoch, DateTime.UtcNow) == System.Windows.Media.Colors.Black, "saved lighting OFF was not preserved");
+    return Task.CompletedTask;
+}
+
+static async Task BackgroundLightingReconnectRestore()
+{
+    var transport = new FakeLightingTransport { OpensAfterAttempt = 3 };
+    SavedLightingState state = SavedLightingState.From(new AppSettings { LastHex = "#204060", Brightness = 100, Effect = "Static", IsLightingEnabled = true });
+    await using var restorer = new BackgroundLightingRestorer(transport, () => true, () => state,
+        TimeSpan.FromMilliseconds(2), TimeSpan.FromMilliseconds(8));
+    restorer.Start();
+    await WaitUntil(() => transport.Writes.Count == 1);
+    await Task.Delay(35);
+    Require(transport.Writes.Count == 1, "healthy static connection was reset repeatedly");
+
+    transport.Disconnect();
+    await WaitUntil(() => transport.Writes.Count == 2);
+    Require(transport.OpenAttempts >= 4, "delayed/reconnected SC3 did not retry before restore");
+}
+
 static Task StartupPolicy()
 {
     Require(!CustomShortcutHostPolicy.ShouldRegisterStartup(false,false), "startup unexpectedly enabled");
@@ -294,8 +357,8 @@ static CustomButtonShortcutController NewController(FakeTransport transport, Fun
     FakeLauncher launcher, int pollMs = 3, int retryMs = 20) =>
     new(transport, resolver, launcher, TimeSpan.FromMilliseconds(pollMs), TimeSpan.FromMilliseconds(retryMs));
 
-static FakeTransport SessionTransport() => FakeTransport.WithSequence(Reply(0,1,0), Reply(0,1,1), Reply(0,1,1));
-static Sc3QueryReply Reply(byte key, ushort counter, byte mode) => new(Sc3FirmwareFlavor.Mod15,true,true,2,key,counter,mode);
+static FakeTransport SessionTransport() => FakeTransport.WithSequence(Reply(0,1,0), Reply(0,1,1));
+static Sc3QueryReply Reply(byte key, ushort counter, byte mode) => new(Sc3FirmwareFlavor.Mod15,true,true,4,key,counter,mode);
 
 static void CheckReport(byte[] report, byte[] payload)
 {
@@ -319,6 +382,63 @@ static void Require(bool condition, string message)
     if (!condition) throw new Exception(message);
 }
 
+static async Task ProductionPollingSafetyGuard()
+{
+    var transport = SessionTransport();
+    await using var controller = new CustomButtonShortcutController(
+        transport, _ => "A.exe", new FakeLauncher(),
+        TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(750),
+        eventDrivenTransportAllowed: false);
+    await controller.SetPreferenceAsync(true);
+    await Task.Delay(150);
+    Require(!controller.IsRunning && transport.QueryCalls == 0,
+        "stability guard allowed continuous FC/02 traffic");
+}
+
+static Task StabilityPolicy()
+{
+    Require(CustomShortcutStabilityPolicy.EventDrivenTransportEnabled,
+        "event-driven shortcut transport was unexpectedly disabled");
+    Require(CustomShortcutStabilityPolicy.Message.Contains("event-driven", StringComparison.OrdinalIgnoreCase),
+        "event firmware requirement is missing");
+    return Task.CompletedTask;
+}
+
+static Task EventInterfaceProfile()
+{
+    const string control = @"\\?\hid#vid_3142&pid_0c33&mi_04#control";
+    const string events = @"\\?\hid#vid_3142&pid_0c33&mi_03#events";
+    Require(HidDeviceClient.MatchesExpectedIdentity(
+        control, 0x3142, 0x0C33, "MV-SILICON", "fifine SC3", "20190808",
+        0xFF00, 0x55AA, 257, 257, 9), "MI_04 control profile was rejected");
+    Require(!HidDeviceClient.MatchesExpectedIdentity(
+        events, 0x3142, 0x0C33, "MV-SILICON", "fifine SC3", "20190808",
+        0x00FF, 0x0001, 2, 0, 0), "MI_03 was accepted as the control profile");
+    Require(HidDeviceClient.MatchesExpectedEventIdentity(
+        events, 0x3142, 0x0C33, "MV-SILICON", "fifine SC3", "20190808",
+        0x00FF, 0x0001, 2, 0, 0), "MI_03 event profile was rejected");
+    Require(!HidDeviceClient.MatchesExpectedEventIdentity(
+        control, 0x3142, 0x0C33, "MV-SILICON", "fifine SC3", "20190808",
+        0xFF00, 0x55AA, 257, 257, 9), "MI_04 was accepted as the event profile");
+    return Task.CompletedTask;
+}
+
+static async Task EventDrivenShortcuts()
+{
+    var transport = SessionTransport();
+    await using var controller = NewController(transport, _ => "A.exe", new FakeLauncher());
+    await controller.SetPreferenceAsync(true);
+    await WaitUntil(() => controller.IsActive);
+    await Task.Delay(40);
+    Require(transport.SessionPrimeCalls == 1, "interrupt session was initialized more than once");
+    Require(transport.DrainCalls == 1, "stale interrupt queue was not drained exactly once");
+    Require(transport.OffWrites == 1, "interrupt session did not return to STOCK before draining");
+    Require(transport.Operations.Take(4).SequenceEqual(new[] { "BEGIN", "OFF", "DRAIN", "ON" }),
+        "event session order was not BEGIN -> STOCK -> DRAIN -> SHORTCUT");
+    Require(transport.EventReadCalls >= 2, "interrupt event reads did not continue");
+    Require(transport.QueryCalls == 0, "shortcut loop issued FC/02 control queries");
+}
+
 sealed class FakeLauncher : IApplicationShortcutLauncher
 {
     public List<string> Launched { get; } = [];
@@ -334,14 +454,18 @@ sealed class FakeTransport : ISc3CustomButtonTransport
 {
     private readonly object _gate = new();
     private readonly Queue<Sc3QueryReply> _replies = new();
-    private Sc3QueryReply _last = new(Sc3FirmwareFlavor.Mod15,true,true,2,0,0,0);
+    private Sc3QueryReply _last = new(Sc3FirmwareFlavor.Mod15,true,true,4,0,0,0);
     private int _queriesInFlight;
     public bool OpenOk { get; set; } = true;
     public bool QueryOk { get; set; } = true;
     public int EnabledWrites { get; private set; }
     public int OffWrites { get; private set; }
     public int QueryCalls { get; private set; }
+    public int SessionPrimeCalls { get; private set; }
+    public int DrainCalls { get; private set; }
+    public int EventReadCalls { get; private set; }
     public int MaxConcurrentQueries { get; private set; }
+    public List<string> Operations { get; } = [];
 
     public static FakeTransport WithSequence(params Sc3QueryReply[] replies)
     {
@@ -355,13 +479,40 @@ sealed class FakeTransport : ISc3CustomButtonTransport
 
     public bool TryQuerySc3(out Sc3QueryReply reply, out string detail)
     {
+        QueryCalls++;
+        return ReadReply(out reply, out detail);
+    }
+
+    public bool TryBeginCustomButtonEventSession(out Sc3QueryReply reply, out string detail)
+    {
+        SessionPrimeCalls++;
+        lock (_gate) Operations.Add("BEGIN");
+        return ReadReply(out reply, out detail);
+    }
+
+    public Task<CustomButtonDrainResult> DrainCustomButtonEventsAsync(CancellationToken token)
+    {
+        DrainCalls++;
+        lock (_gate) Operations.Add("DRAIN");
+        return Task.FromResult(new CustomButtonDrainResult(true, 0, "Queue empty"));
+    }
+
+    public async Task<CustomButtonReadResult> ReadCustomButtonEventAsync(CancellationToken token)
+    {
+        EventReadCalls++;
+        await Task.Delay(1, token);
+        bool success = ReadReply(out Sc3QueryReply reply, out string detail);
+        return new(success, reply, detail);
+    }
+
+    private bool ReadReply(out Sc3QueryReply reply, out string detail)
+    {
         int active = Interlocked.Increment(ref _queriesInFlight);
         lock (_gate) MaxConcurrentQueries = Math.Max(MaxConcurrentQueries, active);
         try
         {
             lock (_gate)
             {
-                QueryCalls++;
                 if (!QueryOk) { reply=default!; detail="Query failed"; return false; }
                 if (_replies.Count>0) _last=_replies.Dequeue();
                 reply=_last; detail="OK"; return true;
@@ -374,9 +525,35 @@ sealed class FakeTransport : ISc3CustomButtonTransport
     {
         lock (_gate)
         {
-            if (enabled) { EnabledWrites++; _last=_last with { RuntimeMode=1 }; }
-            else { OffWrites++; _last=_last with { RuntimeMode=0 }; }
+            if (enabled) { EnabledWrites++; Operations.Add("ON"); _last=_last with { RuntimeMode=1 }; }
+            else { OffWrites++; Operations.Add("OFF"); _last=_last with { RuntimeMode=0 }; }
             detail="OK"; return true;
         }
     }
+}
+
+sealed class FakeLightingTransport : ISc3LightingTransport
+{
+    public int OpensAfterAttempt { get; set; } = 1;
+    public int OpenAttempts { get; private set; }
+    public bool IsConnected { get; private set; }
+    public List<(byte R, byte G, byte B)> Writes { get; } = [];
+
+    public bool TryOpen(out string detail)
+    {
+        OpenAttempts++;
+        IsConnected = OpenAttempts >= OpensAfterAttempt;
+        detail = IsConnected ? "Connected" : "Unavailable";
+        return IsConnected;
+    }
+
+    public bool TryWriteColor(byte red, byte green, byte blue, out string detail)
+    {
+        if (!IsConnected) { detail = "Disconnected"; return false; }
+        Writes.Add((red, green, blue));
+        detail = "Applied";
+        return true;
+    }
+
+    public void Disconnect() => IsConnected = false;
 }

@@ -2,11 +2,17 @@ namespace SC3RGBController.Services;
 
 public enum CustomShortcutRuntimeState { Stock, Active, Unavailable }
 public sealed record CustomShortcutState(CustomShortcutRuntimeState State, string Message);
+public sealed record CustomButtonReadResult(bool Success, Sc3QueryReply Reply, string Detail, bool Cancelled = false);
+public sealed record CustomButtonDrainResult(bool Success, int DrainedReports, string Detail, bool Cancelled = false);
 
 public interface ISc3CustomButtonTransport
 {
     bool TryOpen(out string detail);
     bool TryQuerySc3(out Sc3QueryReply reply, out string detail);
+    bool TryBeginCustomButtonEventSession(out Sc3QueryReply reply, out string detail) =>
+        TryQuerySc3(out reply, out detail);
+    Task<CustomButtonDrainResult> DrainCustomButtonEventsAsync(CancellationToken token);
+    Task<CustomButtonReadResult> ReadCustomButtonEventAsync(CancellationToken token);
     bool TrySetCustomButtonMode(bool enabled, out string detail);
 }
 
@@ -17,6 +23,7 @@ public sealed class CustomButtonShortcutController : IAsyncDisposable
     private readonly IApplicationShortcutLauncher _launcher;
     private readonly TimeSpan _pollInterval;
     private readonly TimeSpan _retryInterval;
+    private readonly bool _eventDrivenTransportAllowed;
     private readonly CustomButtonEventTracker _tracker = new();
     private readonly SemaphoreSlim _stateGate = new(1, 1);
     private CancellationTokenSource? _cts;
@@ -32,7 +39,8 @@ public sealed class CustomButtonShortcutController : IAsyncDisposable
     public bool IsRunning => _pollTask is { IsCompleted: false };
 
     public CustomButtonShortcutController(HidDeviceClient hid, Func<CustomButtonId, string?> pathResolver)
-        : this(hid, pathResolver, new ApplicationShortcutLauncher(), TimeSpan.FromMilliseconds(50), TimeSpan.FromSeconds(1))
+        : this(hid, pathResolver, new ApplicationShortcutLauncher(), TimeSpan.Zero, TimeSpan.FromSeconds(5),
+            eventDrivenTransportAllowed: CustomShortcutStabilityPolicy.EventDrivenTransportEnabled)
     {
     }
 
@@ -41,18 +49,28 @@ public sealed class CustomButtonShortcutController : IAsyncDisposable
         Func<CustomButtonId, string?> pathResolver,
         IApplicationShortcutLauncher launcher,
         TimeSpan pollInterval,
-        TimeSpan retryInterval)
+        TimeSpan retryInterval,
+        bool eventDrivenTransportAllowed = true)
     {
         _transport = transport;
         _pathResolver = pathResolver;
         _launcher = launcher;
         _pollInterval = pollInterval;
         _retryInterval = retryInterval;
+        _eventDrivenTransportAllowed = eventDrivenTransportAllowed;
     }
 
     public async Task SetPreferenceAsync(bool enabled)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (enabled && !_eventDrivenTransportAllowed)
+        {
+            _desiredEnabled = false;
+            await StopAsync(sendOff: false);
+            SetUnavailable();
+            ActionStatus?.Invoke(this, CustomShortcutStabilityPolicy.Message);
+            return;
+        }
         _desiredEnabled = enabled;
         if (!enabled)
         {
@@ -89,7 +107,7 @@ public sealed class CustomButtonShortcutController : IAsyncDisposable
     {
         while (!token.IsCancellationRequested && _desiredEnabled)
         {
-            if (!TryEstablishShortcutSession())
+            if (!await TryEstablishShortcutSessionAsync(token))
             {
                 SetUnavailable();
                 if (!await DelayRetryAsync(token)) return;
@@ -98,8 +116,11 @@ public sealed class CustomButtonShortcutController : IAsyncDisposable
 
             while (!token.IsCancellationRequested && _desiredEnabled && IsActive)
             {
-                if (!_transport.TryQuerySc3(out Sc3QueryReply reply, out _) ||
-                    !reply.SupportsFinalCustomShortcuts || reply.RuntimeMode != 1)
+                CustomButtonReadResult read = await _transport.ReadCustomButtonEventAsync(token);
+                if (read.Cancelled)
+                    return;
+                Sc3QueryReply reply = read.Reply;
+                if (!read.Success || !reply.SupportsFinalCustomShortcuts || reply.RuntimeMode != 1)
                 {
                     IsActive = false;
                     SetUnavailable();
@@ -107,14 +128,11 @@ public sealed class CustomButtonShortcutController : IAsyncDisposable
                 }
 
                 HandleEventReply(reply);
-                try
-                {
-                    await Task.Delay(_pollInterval, token);
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
+                // Real interrupt reads wait for a release. This tiny yield also
+                // keeps deterministic fake transports from becoming a busy loop.
+                if (_pollInterval > TimeSpan.Zero)
+                    try { await Task.Delay(_pollInterval, token); }
+                    catch (OperationCanceledException) { return; }
             }
 
             if (!token.IsCancellationRequested && _desiredEnabled && !await DelayRetryAsync(token))
@@ -122,25 +140,31 @@ public sealed class CustomButtonShortcutController : IAsyncDisposable
         }
     }
 
-    private bool TryEstablishShortcutSession()
+    private async Task<bool> TryEstablishShortcutSessionAsync(CancellationToken token)
     {
-        if (!_transport.TryOpen(out _) || !_transport.TryQuerySc3(out Sc3QueryReply baseline, out _))
+        if (!_transport.TryOpen(out _) ||
+            !_transport.TryBeginCustomButtonEventSession(out Sc3QueryReply baseline, out _))
             return false;
         if (!baseline.SupportsFinalCustomShortcuts)
             return false;
 
-        _tracker.SetBaseline(baseline.Counter);
+        // A process can exit unexpectedly while firmware is still in shortcut
+        // mode. Return to STOCK first, then drain any already-buffered interrupt
+        // reports before enabling a new session. This avoids endpoint resets in
+        // firmware and prevents a stale press from launching on restart.
+        if (!_transport.TrySetCustomButtonMode(false, out _))
+            return false;
+        CustomButtonDrainResult drained = await _transport.DrainCustomButtonEventsAsync(token);
+        if (!drained.Success || drained.Cancelled)
+            return false;
+
+        _tracker.ArmForInterruptEvents();
         if (!_transport.TrySetCustomButtonMode(true, out _))
             return false;
         _sessionCommandActive = true;
 
-        if (!_transport.TryQuerySc3(out Sc3QueryReply confirmed, out _) ||
-            !confirmed.SupportsFinalCustomShortcuts || confirmed.RuntimeMode != 1)
-            return false;
-
         IsActive = true;
         SetState(CustomShortcutRuntimeState.Active);
-        HandleEventReply(confirmed);
         return true;
     }
 

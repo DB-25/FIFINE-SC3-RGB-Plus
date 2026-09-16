@@ -18,8 +18,8 @@ $UpdaterOutput = Join-Path $ProjectRoot "outputs\SC3FirmwareTool-v$AppSemanticVe
 $InstallerScript = Join-Path $ProjectRoot "Installer\FIFINE-SC3-RGB-Plus.iss"
 
 $Firmware = Join-Path $ProjectRoot "firmware\candidates\mod15\SC3-V22-RGB-Mod-1.5-CustomButtons.mva"
-$ExpectedFirmwareHash = "589B2FCB590B999C905693DF6ABA6A343343AC6A8241B4AA9802853A72FA525B"
-$ExpectedFirmwareCrc16 = 0xC12C
+$ExpectedFirmwareHash = "02DACD0F2692E4EA064647378718047DED3C197081B53A26A95A0E8BDF6F9ACF"
+$ExpectedFirmwareCrc16 = 0xFB45
 $StockFirmware = Join-Path $ProjectRoot "firmware\recovery\SC3_V22_recovery.MVA"
 $ExpectedStockFirmwareHash = "01A282431C3D82FFD64AA7095F8E151893F459094E2C5EE08010DBA430CFFCDD"
 
@@ -90,9 +90,9 @@ if (-not $ISCC) {
 
 Push-Location (Split-Path -Parent $InstallerScript)
 try {
-    $VersionDefine = "/DMyAppVersion=`"$AppSemanticVersion`""
-    $NumericVersionDefine = "/DMyAppNumericVersion=`"$AppNumericVersion`""
-    $UpdaterOutputDefine = "/DUpdaterOutputFolder=`"SC3FirmwareTool-v$AppSemanticVersion`""
+    $VersionDefine = "/DMyAppVersion=$AppSemanticVersion"
+    $NumericVersionDefine = "/DMyAppNumericVersion=$AppNumericVersion"
+    $UpdaterOutputDefine = "/DUpdaterOutputFolder=SC3FirmwareTool-v$AppSemanticVersion"
     & $ISCC $VersionDefine $NumericVersionDefine $UpdaterOutputDefine (Split-Path -Leaf $InstallerScript)
     if ($LASTEXITCODE -ne 0) {
         throw "Inno Setup compiler failed with exit code $LASTEXITCODE."

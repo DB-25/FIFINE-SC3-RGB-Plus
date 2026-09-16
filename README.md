@@ -25,7 +25,7 @@ for the supported SC3 device profile.
 
 ## Installation
 
-1. Download `FIFINE-SC3-RGB-Plus-2.5.0-Setup.exe` from [Releases](../../releases).
+1. Download `FIFINE-SC3-RGB-Plus-2.5.1-Setup.exe` from [Releases](../../releases).
 2. Install FIFINE SC3 RGB+.
 3. Connect the FIFINE SC3.
 4. If RGB+ firmware is not installed, use the in-app firmware setup action. New Stock V22 devices install the current RGB+ Firmware 1.5 directly.
@@ -34,6 +34,9 @@ Custom Button Shortcuts require **RGB+ Firmware 1.5**. If you already use RGB+
 Firmware 1.4, open **Settings → Updates** and choose **Update Firmware**. The
 application update and mixer firmware update are separate operations; mixer
 firmware is never flashed automatically.
+
+The current Firmware 1.5 sends Custom A–D events through the SC3 interrupt
+interface, so shortcuts remain responsive without continuous firmware polling.
 
 Normal users do not need to download MVA files or use a vendor updater manually.
 Do not disconnect the SC3 while firmware setup, update, or restoration is in progress.

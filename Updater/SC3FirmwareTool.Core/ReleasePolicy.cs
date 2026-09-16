@@ -4,11 +4,11 @@ public static class ReleasePolicy
 {
     public const string NativeUpdaterReleaseTier = "ProductionStable";
     public const string FirmwareFileName = "SC3-V22-RGB-Mod-1.5-CustomButtons.mva";
-    public const string FirmwareSha256 = "589b2fcb590b999c905693df6aba6a343343ac6a8241b4aa9802853a72fa525b";
+    public const string FirmwareSha256 = "02dacd0f2692e4ea064647378718047ded3c197081b53a26a95a0e8bdf6f9acf";
     public const long FirmwareSize = 1_726_821;
-    public const ushort FirmwareCrc16 = 0xC12C;
+    public const ushort FirmwareCrc16 = 0xFB45;
     public const string BuildId = "SC3R-11150100";
-    public const byte CbtnVersion = 2;
+    public const byte CbtnVersion = 4;
     public const string OfficialVersion = "1.33.5";
     public static readonly byte[] Attestation = Convert.FromHexString("5343335211150100");
 

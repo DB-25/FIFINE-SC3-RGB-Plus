@@ -62,7 +62,7 @@ internal static class HidDiscovery
         x.Version == ReleasePolicy.BcdDevice && x.Manufacturer == ReleasePolicy.Manufacturer &&
         x.Product == ReleasePolicy.Product && x.Serial == ReleasePolicy.Serial &&
         x.UsagePage == ReleasePolicy.UsagePage && x.Usage == ReleasePolicy.Usage &&
-        x.InputLength == 257 && x.OutputLength == 257 && x.FeatureLength == 9 &&
+        x.InputLength is 257 or 64 && x.OutputLength == 257 && x.FeatureLength == 9 &&
         x.Path.Contains("vid_3142&pid_0c33&mi_04", StringComparison.OrdinalIgnoreCase) &&
         x.Path.Contains(ReleasePolicy.ValidatedHidInstance, StringComparison.OrdinalIgnoreCase);
 
@@ -140,7 +140,7 @@ internal sealed class HidConnection : IDisposable
 
     public byte[] Read(int timeout = 2000) => Read(() =>
     {
-        byte[] report = new byte[257]; bool ok = Native.HidD_GetInputReport(_handle, report, report.Length);
+        byte[] report = new byte[Identity.InputLength]; bool ok = Native.HidD_GetInputReport(_handle, report, report.Length);
         return (ok, report);
     }, "GET_REPORT", timeout).AsSpan(1).ToArray();
 

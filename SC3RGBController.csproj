@@ -21,6 +21,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Updater\**\*.cs" />
+    <Compile Remove="work\**\*.cs" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing.Common" />
     <Compile Remove="captures\**\*.cs" />
