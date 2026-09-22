@@ -25,7 +25,7 @@ for the supported SC3 device profile.
 
 ## Installation
 
-1. Download `FIFINE-SC3-RGB-Plus-2.5.1-Setup.exe` from [Releases](../../releases).
+1. Download `FIFINE-SC3-RGB-Plus-2.5.2-Setup.exe` from [Releases](../../releases).
 2. Install FIFINE SC3 RGB+.
 3. Connect the FIFINE SC3.
 4. If RGB+ firmware is not installed, use the in-app firmware setup action. New Stock V22 devices install the current RGB+ Firmware 1.5 directly.

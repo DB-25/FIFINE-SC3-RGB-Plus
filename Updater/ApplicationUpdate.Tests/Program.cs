@@ -12,6 +12,7 @@ List<(string Name, Func<Task> Run)> tests =
     ("newer stable release detected", NewerStableReleaseDetected),
     ("v2.4.0 stable sees v2.5.0 stable", Stable240SeesStable250),
     ("v2.5.0 stable sees v2.5.1 stable", Stable250SeesStable251),
+    ("v2.5.1 stable sees v2.5.2 stable", Stable251SeesStable252),
     ("beta build receives newer beta", BetaBuildReceivesNewerBeta),
     ("stable build ignores beta release", StableBuildIgnoresBeta),
     ("draft and malformed releases ignored", DraftAndMalformedIgnored),
@@ -67,6 +68,15 @@ static async Task Stable250SeesStable251()
     Assert(result.Status == UpdateCheckStatus.UpdateAvailable && result.Candidate?.Version.Equals(V("2.5.1")) == true);
     Assert(result.Candidate?.Installer.Name == "FIFINE-SC3-RGB-Plus-2.5.1-Setup.exe");
 }
+
+static async Task Stable251SeesStable252()
+{
+    ReleaseInfo release = CompleteRelease("v2.5.2", "payload");
+    UpdateCheckResult result = await Service([release]).CheckForUpdatesAsync(V("2.5.1"));
+    Assert(result.Status == UpdateCheckStatus.UpdateAvailable && result.Candidate?.Version.Equals(V("2.5.2")) == true);
+    Assert(result.Candidate?.Installer.Name == "FIFINE-SC3-RGB-Plus-2.5.2-Setup.exe");
+}
+
 static async Task BetaBuildReceivesNewerBeta()
 {
     UpdateCheckResult result = await Service([CompleteRelease("v2.4.0-beta", "payload")]).CheckForUpdatesAsync(V("2.3.0-beta"));

@@ -28,6 +28,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("RGB transport regression", RgbRegression),
     ("Effect Speed regression", EffectSpeedRegression),
     ("saved lighting state restores without a MainWindow", SavedLightingStateRestore),
+    ("lighting worker does not read WPF controls", LightingWorkerAvoidsWpfControls),
     ("background lighting retries and restores once per connection", BackgroundLightingReconnectRestore),
     ("startup policy keeps background registered when shortcuts ON", StartupPolicy),
     ("production controller blocks unavailable event transport", ProductionPollingSafetyGuard),
@@ -326,6 +327,20 @@ static Task SavedLightingStateRestore()
 
     SavedLightingState off = SavedLightingState.From(new AppSettings { IsLightingEnabled = false, Effect = "Rainbow", Brightness = 100 });
     Require(off.GetOutput(DateTime.UnixEpoch, DateTime.UtcNow) == System.Windows.Media.Colors.Black, "saved lighting OFF was not preserved");
+    return Task.CompletedTask;
+}
+
+static Task LightingWorkerAvoidsWpfControls()
+{
+    string source = File.ReadAllText(Path.Combine(FindRepoRoot(), "MainWindow.xaml.cs"));
+    int start = source.IndexOf("private Color GetEffectColor", StringComparison.Ordinal);
+    int end = source.IndexOf("private static LightingEffect ParseLightingEffect", start, StringComparison.Ordinal);
+    Require(start >= 0 && end > start, "GetEffectColor source block was not found");
+    string workerMethod = source[start..end];
+    Require(!workerMethod.Contains("CurrentBrightness", StringComparison.Ordinal),
+        "background lighting worker reads the WPF brightness slider");
+    Require(workerMethod.Contains("_settings.Brightness", StringComparison.Ordinal),
+        "background lighting worker does not use the thread-safe saved brightness value");
     return Task.CompletedTask;
 }
 

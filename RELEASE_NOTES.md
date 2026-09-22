@@ -1,6 +1,17 @@
-# FIFINE SC3 RGB+ v2.5.1
+# FIFINE SC3 RGB+ v2.5.2
 
-Stable reliability update for Custom Button Shortcuts and background startup.
+Stable lighting hotfix.
+
+- Fixes color, brightness, and effect changes failing after v2.5.1
+- Keeps the lighting worker independent from WPF UI controls
+- Preserves the event-driven Custom Button shortcut and mixer-freeze fix from v2.5.1
+- Preserves saved lighting restoration at Windows startup and after reconnect
+
+The issue was caused by the background lighting worker reading the brightness slider directly. WPF rejected that cross-thread UI access before the first FC/04 lighting command. The worker now uses the saved brightness value, and color, brightness, Static, Breathing, Rainbow, Pulse, and Color Cycle operate through the existing serialized RGB transport.
+
+RGB+ Firmware 1.5 is unchanged in this application hotfix.
+
+## Included from v2.5.1
 
 - Fixes intermittent full-mixer and audio freezes caused by continuous FC/02 polling
 - Moves Custom A/B/C/D shortcuts to event-driven MI_03 interrupt reports

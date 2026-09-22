@@ -1499,7 +1499,7 @@ public partial class MainWindow : Window
             startedAt = _effectStartedAt;
             state = new SavedLightingState(
                 _selectedColor,
-                CurrentBrightness,
+                _settings.Brightness,
                 _settings.IsLightingEnabled,
                 _selectedEffect,
                 GetEffectSpeed(_selectedEffect));
