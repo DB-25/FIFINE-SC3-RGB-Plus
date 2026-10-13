@@ -3,6 +3,10 @@
 FIFINE SC3 RGB+ is a Windows application that adds customizable RGB lighting
 control and Custom Button Shortcuts to the FIFINE AmpliGame SC3 mixer.
 
+![FIFINE SC3 RGB+: the mixer's LEDs changing color, the live lighting page, the five effects, the Custom A–D button picker, setup and updates, and accessibility](docs/brag.gif)
+
+*25-second tour. [Watch it with sound (MP4)](docs/brag.mp4).*
+
 ![FIFINE SC3 RGB+ lighting page](docs/screenshots/lighting.png)
 
 ## Features
@@ -25,10 +29,6 @@ control and Custom Button Shortcuts to the FIFINE AmpliGame SC3 mixer.
 - Automatic SC3 detection, reconnect handling, and Start with Windows
 
 ## What's new in this update
-
-[![FIFINE SC3 RGB+: 21-second demo. Click to play.](docs/brag.jpg)](docs/brag.mp4)
-
-*21-second demo. Click the image to play the video.*
 
 **Works on every PC, not just one.** Earlier builds checked a USB device ID that Windows
 generates separately for each PC and USB port, so every SC3 except the original
