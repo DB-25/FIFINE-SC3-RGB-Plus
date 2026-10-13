@@ -294,8 +294,10 @@ public partial class CustomActionPickerWindow : Window
     private void LaunchList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_syncing) return;
-        _launchSelection = LaunchList.SelectedItem as PickerAppItem;
-        if (_launchSelection is not null) _launchOverride = null;
+        // Only a real pick changes the choice; deselection caused by filtering keeps it.
+        if ((e.AddedItems.OfType<PickerAppItem>().FirstOrDefault() ?? LaunchList.SelectedItem as PickerAppItem) is not { } picked) return;
+        _launchSelection = picked;
+        _launchOverride = null;
         UpdateChosenTexts();
         UpdateSummary();
     }
@@ -333,8 +335,9 @@ public partial class CustomActionPickerWindow : Window
     private void AudioList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_syncing) return;
-        _audioSelection = AudioList.SelectedItem as PickerAppItem;
-        if (_audioSelection is not null) _audioOverride = null;
+        if ((e.AddedItems.OfType<PickerAppItem>().FirstOrDefault() ?? AudioList.SelectedItem as PickerAppItem) is not { } picked) return;
+        _audioSelection = picked;
+        _audioOverride = null;
         UpdateChosenTexts();
         UpdateSummary();
     }
@@ -553,7 +556,9 @@ public partial class CustomActionPickerWindow : Window
         try
         {
             view.Refresh();
-            if (selection is not null && view.PassesFilter(selection)) list.SelectedItem = selection;
+            // The remembered choice stays in _launchSelection/_audioSelection, but the ListBox must not keep a
+            // hidden item selected: it would swallow the user's next pick (bug: couldn't replace a saved app).
+            list.SelectedItem = selection is not null && view.PassesFilter(selection) ? selection : null;
         }
         finally { _syncing = false; }
         updateStatus();
