@@ -24,6 +24,7 @@ public partial class App : Application
     {
         // Swap design tokens for system colors before any window loads (most markup uses StaticResource).
         ThemeManager.ApplyHighContrastIfEnabled(Current.Resources);
+        ThemeManager.UseDarkTitleBarsForAllWindows();
         SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
 
         _instanceMutex = new Mutex(true, InstanceMutexName, out bool firstInstance);

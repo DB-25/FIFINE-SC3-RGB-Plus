@@ -15,6 +15,7 @@ using System.Windows.Threading;
 using SC3RGBController.Models;
 using SC3RGBController.Services;
 using SC3RGBController.Services.Updates;
+using SC3RGBController.Services.Actions;
 using SC3RGBController.UI.Controls;
 using SC3RGBController.UI;
 using SC3FirmwareTool.Core;
@@ -35,6 +36,7 @@ public partial class MainWindow : Window
     private readonly TrayCommandRouter _trayCommands = new();
     private readonly SystemTrayService _tray;
     private readonly FirmwareService _firmwareService = new();
+    private readonly Services.Audio.AudioControlService _audio = new();
     private readonly ApplicationUpdateService _applicationUpdateService = ApplicationUpdateService.CreateDefault(AppVersionInfo.Current);
     private readonly object _colorGate = new();
     private readonly DispatcherTimer _statusTimer;
@@ -99,7 +101,12 @@ public partial class MainWindow : Window
         UpdateStartupRegistration();
         AppVersionText.Text = $"App version {AppVersionInfo.Current}";
         IntegratedSettingsView.ConfigureUpdates(AppVersionInfo.DisplayVersion, _settings.AutomaticallyCheckForUpdates);
+        DescribeLegacyCustomAssignments();
         IntegratedSettingsView.ConfigureCustomButtons(_settings);
+        IntegratedSettingsView.CurrentActionProvider = GetCustomButtonPath;
+        IntegratedSettingsView.AudioAppsProvider = () => _audio.GetActiveSessions()
+            .Select(s => (s.ProcessName, s.DisplayName)).ToList();
+        _ = Services.Apps.InstalledAppCatalog.Shared.GetAppsAsync(); // warm the picker's app list
         _customButtons = new CustomButtonShortcutController(_hid, GetCustomButtonPath);
         _customButtons.StateChanged += CustomButtons_StateChanged;
         _customButtons.ActionStatus += (_, message) => Dispatcher.BeginInvoke(() => ShowInlineStatus(message));
@@ -1100,6 +1107,26 @@ public partial class MainWindow : Window
         CustomButtonId.C => _settings.CustomCPath,
         _ => _settings.CustomDPath
     };
+
+    // Assignments saved before actions existed store a bare file name ("notepad"); show them as "Open notepad".
+    private void DescribeLegacyCustomAssignments()
+    {
+        foreach (CustomButtonId button in Enum.GetValues<CustomButtonId>())
+        {
+            string? path = GetCustomButtonPath(button);
+            CustomButtonAction action = CustomButtonAction.Parse(path);
+            string? name = button switch
+            {
+                CustomButtonId.A => _settings.CustomAName,
+                CustomButtonId.B => _settings.CustomBName,
+                CustomButtonId.C => _settings.CustomCName,
+                _ => _settings.CustomDName
+            };
+            if (action.Kind == CustomActionKind.LaunchProgram && !string.IsNullOrWhiteSpace(name) &&
+                !name.StartsWith("Open ", StringComparison.Ordinal))
+                SetCustomButtonAssignment(button, path, action.Describe(name));
+        }
+    }
 
     private void SetCustomButtonAssignment(CustomButtonId button, string? path, string? name)
     {

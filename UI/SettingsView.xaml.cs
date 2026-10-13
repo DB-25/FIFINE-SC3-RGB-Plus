@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using Microsoft.Win32;
 using SC3RGBController.Models;
 using SC3RGBController.Services;
+using SC3RGBController.Services.Actions;
 using SC3RGBController.Services.Updates;
 
 namespace SC3RGBController.UI;
@@ -352,16 +353,25 @@ public partial class SettingsView : UserControl
     private void ChooseCustomApp_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || !Enum.TryParse(button.Tag?.ToString(), out CustomButtonId id)) return;
-        OpenFileDialog dialog = new()
+        CustomButtonAction current = CustomButtonAction.Parse(CurrentActionProvider?.Invoke(id));
+        CustomActionPickerWindow picker = new($"Custom {id}", current, AudioAppsProvider)
         {
-            Title = $"Choose application for Custom {id}",
-            Filter = "Applications (*.exe;*.lnk)|*.exe;*.lnk",
-            CheckFileExists = true,
-            Multiselect = false
+            Owner = Window.GetWindow(this)
         };
-        if (dialog.ShowDialog() == true)
-            CustomAppChosen?.Invoke(this, new(id, dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName)));
+        if (picker.ShowDialog() != true) { button.Focus(); return; }
+
+        if (picker.SelectedAction.Kind == CustomActionKind.None)
+            CustomAppCleared?.Invoke(this, new(id));
+        else
+            CustomAppChosen?.Invoke(this, new(id, picker.SelectedAction.Serialize(), picker.SelectedDisplayName));
+        button.Focus();
     }
+
+    /// <summary>Returns the stored action string for a button (set by the host window).</summary>
+    public Func<CustomButtonId, string?>? CurrentActionProvider { get; set; }
+
+    /// <summary>Apps currently playing audio, for the picker's App audio list (set by the host window).</summary>
+    public Func<IReadOnlyList<(string ProcessName, string DisplayName)>>? AudioAppsProvider { get; set; }
 
     private void ClearCustomApp_Click(object sender, RoutedEventArgs e)
     {

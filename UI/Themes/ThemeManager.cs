@@ -66,4 +66,27 @@ public static class ThemeManager
             resources[key] = value;
         }
     }
+
+    /// <summary>
+    /// Gives every window in the app a dark Windows title bar (Windows 10 2004+/11) so system-framed
+    /// dialogs match the dark UI. Skipped in High Contrast, where Windows draws the frame itself.
+    /// </summary>
+    public static void UseDarkTitleBarsForAllWindows()
+    {
+        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler((sender, _) =>
+        {
+            if (sender is not Window window || SystemParameters.HighContrast) return;
+            IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            int enabled = 1;
+            if (DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int)) != 0)
+                DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkModeLegacy, ref enabled, sizeof(int));
+        }));
+    }
+
+    private const int DwmwaUseImmersiveDarkMode = 20;
+    private const int DwmwaUseImmersiveDarkModeLegacy = 19;
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 }

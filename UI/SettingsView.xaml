@@ -119,7 +119,7 @@
                         <!-- ===================== Custom buttons ===================== -->
                         <StackPanel x:Name="CustomButtonsContent" Visibility="Collapsed">
                             <TextBlock Text="Custom buttons" Style="{StaticResource SettingsSectionHeading}"/>
-                            <TextBlock Text="Use the SC3 Custom A–D buttons to launch applications." Style="{StaticResource CaptionText}" Margin="0,6,0,20"/>
+                            <TextBlock Text="Make the SC3 Custom A–D buttons open an app, mute an app or your microphone, change volume, or control media." Style="{StaticResource CaptionText}" Margin="0,6,0,20"/>
 
                             <Border Style="{StaticResource SettingsGroupBorder}" Margin="0,0,0,16">
                                 <StackPanel>
@@ -164,8 +164,8 @@
                                                    VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"
                                                    AutomationProperties.Name="Custom A: Not assigned"/>
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Tag="A" Content="Choose App" Style="{StaticResource PremiumButton}"
-                                                    AutomationProperties.Name="Choose app for Custom A"
+                                            <Button Tag="A" Content="Choose action…" Style="{StaticResource PremiumButton}"
+                                                    AutomationProperties.Name="Choose action for Custom A"
                                                     AutomationProperties.HelpText="{Binding Text, ElementName=CustomANameText}"
                                                     Click="ChooseCustomApp_Click"/>
                                             <Button Tag="A" Content="Clear" Margin="8,0,0,0" Style="{StaticResource PremiumButton}"
@@ -181,8 +181,8 @@
                                                    VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"
                                                    AutomationProperties.Name="Custom B: Not assigned"/>
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Tag="B" Content="Choose App" Style="{StaticResource PremiumButton}"
-                                                    AutomationProperties.Name="Choose app for Custom B"
+                                            <Button Tag="B" Content="Choose action…" Style="{StaticResource PremiumButton}"
+                                                    AutomationProperties.Name="Choose action for Custom B"
                                                     AutomationProperties.HelpText="{Binding Text, ElementName=CustomBNameText}"
                                                     Click="ChooseCustomApp_Click"/>
                                             <Button Tag="B" Content="Clear" Margin="8,0,0,0" Style="{StaticResource PremiumButton}"
@@ -198,8 +198,8 @@
                                                    VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"
                                                    AutomationProperties.Name="Custom C: Not assigned"/>
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Tag="C" Content="Choose App" Style="{StaticResource PremiumButton}"
-                                                    AutomationProperties.Name="Choose app for Custom C"
+                                            <Button Tag="C" Content="Choose action…" Style="{StaticResource PremiumButton}"
+                                                    AutomationProperties.Name="Choose action for Custom C"
                                                     AutomationProperties.HelpText="{Binding Text, ElementName=CustomCNameText}"
                                                     Click="ChooseCustomApp_Click"/>
                                             <Button Tag="C" Content="Clear" Margin="8,0,0,0" Style="{StaticResource PremiumButton}"
@@ -215,8 +215,8 @@
                                                    VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"
                                                    AutomationProperties.Name="Custom D: Not assigned"/>
                                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Tag="D" Content="Choose App" Style="{StaticResource PremiumButton}"
-                                                    AutomationProperties.Name="Choose app for Custom D"
+                                            <Button Tag="D" Content="Choose action…" Style="{StaticResource PremiumButton}"
+                                                    AutomationProperties.Name="Choose action for Custom D"
                                                     AutomationProperties.HelpText="{Binding Text, ElementName=CustomDNameText}"
                                                     Click="ChooseCustomApp_Click"/>
                                             <Button Tag="D" Content="Clear" Margin="8,0,0,0" Style="{StaticResource PremiumButton}"
