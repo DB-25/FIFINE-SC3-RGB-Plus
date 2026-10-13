@@ -34,7 +34,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("production controller blocks unavailable event transport", ProductionPollingSafetyGuard),
     ("stability policy requires event-driven transport", StabilityPolicy),
     ("MI_03 event profile is distinct from MI_04 control", EventInterfaceProfile),
-    ("shortcut session uses interrupt events without FC/02 polling", EventDrivenShortcuts)
+    ("shortcut session uses interrupt events without FC/02 polling", EventDrivenShortcuts),
+    ("accent foreground and outline colors stay readable", AccentContrast)
 };
 
 foreach (var test in tests)
@@ -390,6 +391,20 @@ static async Task WaitUntil(Func<bool> condition, int timeoutMs = 1000)
         try { await Task.Delay(2, cts.Token); }
         catch (OperationCanceledException) { throw new Exception("Timed out waiting for expected async state"); }
     }
+}
+
+static Task AccentContrast()
+{
+    var panel = System.Windows.Media.Color.FromRgb(9, 9, 9);
+    foreach (string hex in new[] { "#FFFFFF", "#000000", "#FF7800", "#FFD000", "#0000FF", "#00FF00", "#9D00FF", "#202020", "#808080" })
+    {
+        Require(ColorText.TryParseHex(hex, out var color), "parse " + hex);
+        Require(ColorText.Contrast(ColorText.ForegroundOn(color), color) >= 4.5, $"content on {hex} must reach 4.5:1");
+        Require(ColorText.Contrast(ColorText.VisibleOnDark(color), panel) >= 4.5, $"{hex} accent text must reach 4.5:1 on panels");
+    }
+    Require(ColorText.ForegroundOn(System.Windows.Media.Colors.White) == System.Windows.Media.Colors.Black, "white accent uses black content");
+    Require(ColorText.VisibleOnDark(System.Windows.Media.Colors.White) == System.Windows.Media.Colors.White, "bright accents are unchanged");
+    return Task.CompletedTask;
 }
 
 static void Require(bool condition, string message)

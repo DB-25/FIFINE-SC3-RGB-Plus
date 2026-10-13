@@ -66,7 +66,8 @@ public sealed class ColorPreset : INotifyPropertyChanged
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Hex : Name;
 
     [JsonIgnore]
-    public string BorderHex => IsSelected ? Hex : "#343434";
+    public string BorderHex => !IsSelected ? "#343434" :
+        Services.ColorText.TryParseHex(Hex, out var color) ? Services.ColorText.ToHex(Services.ColorText.VisibleOnDark(color)) : Hex;
 
     [JsonIgnore]
     public Thickness CardBorderThickness => IsSelected ? new Thickness(2) : new Thickness(1);

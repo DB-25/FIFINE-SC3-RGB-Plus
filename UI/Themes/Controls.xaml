@@ -6,7 +6,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate>
-                    <Border Margin="-2" Background="Transparent" BorderBrush="{DynamicResource AccentBrush}"
+                    <Border Margin="-2" Background="Transparent" BorderBrush="{DynamicResource AccentTextBrush}"
                             BorderThickness="1" CornerRadius="9" Opacity="0.92" IsHitTestVisible="False">
                         <AdornedElementPlaceholder />
                     </Border>
@@ -39,7 +39,7 @@
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}" />
-        <Setter Property="SelectionTextBrush" Value="{StaticResource TextBrush}" />
+        <Setter Property="SelectionTextBrush" Value="{DynamicResource AccentForegroundBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -49,7 +49,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="#505050" /></Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter TargetName="Chrome" Property="BorderThickness" Value="1.5" /></Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" /><Setter TargetName="Chrome" Property="BorderThickness" Value="1.5" /></Trigger>
                         <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Opacity" Value="0.42" /></Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -88,7 +88,7 @@
         <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         <Setter Property="FontSize" Value="20" />
-        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource DarkFocusVisualStyle}" />
         <Setter Property="Template">
             <Setter.Value>
@@ -139,7 +139,7 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Chrome" Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#191919" /><Setter Property="Foreground" Value="White" /></Trigger>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#191919" /><Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" /></Trigger>
                         <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Opacity" Value="0.65" /></Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -164,11 +164,13 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}" />
-                            <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+                            <Setter TargetName="Thumb" Property="Fill" Value="{DynamicResource AccentForegroundBrush}" />
                             <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
                             <Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0" />
                         </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter TargetName="Track" Property="BorderThickness" Value="2" /></Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+<Setter TargetName="Track" Property="BorderThickness" Value="2" /></Trigger>
                         <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Track" Property="Opacity" Value="0.4" /></Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -225,7 +227,7 @@
                         <Border Height="5" Background="#242424" CornerRadius="3" />
                         <Track x:Name="PART_Track" VerticalAlignment="Center" IsDirectionReversed="False">
                             <Track.DecreaseRepeatButton>
-                                <RepeatButton Command="Slider.DecreaseLarge" Background="{DynamicResource AccentBrush}" BorderThickness="0" Focusable="False">
+                                <RepeatButton Command="Slider.DecreaseLarge" Background="{DynamicResource AccentTextBrush}" BorderThickness="0" Focusable="False">
                                     <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="{TemplateBinding Background}" CornerRadius="3" /></ControlTemplate></RepeatButton.Template>
                                 </RepeatButton>
                             </Track.DecreaseRepeatButton>
@@ -243,7 +245,7 @@
                                             </Ellipse>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ThumbChrome" Property="Fill" Value="#F3F3F3" /></Trigger>
-                                                <Trigger Property="IsDragging" Value="True"><Setter TargetName="ThumbChrome" Property="Stroke" Value="{DynamicResource AccentBrush}" /><Setter TargetName="ThumbChrome" Property="StrokeThickness" Value="2" /></Trigger>
+                                                <Trigger Property="IsDragging" Value="True"><Setter TargetName="ThumbChrome" Property="Stroke" Value="{DynamicResource AccentTextBrush}" /><Setter TargetName="ThumbChrome" Property="StrokeThickness" Value="2" /></Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Thumb.Template>
@@ -254,7 +256,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="FocusChrome" Property="BorderBrush" Value="#3A3A3A" /></Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusChrome" Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" /></Trigger>
                         <Trigger Property="IsEnabled" Value="False"><Setter TargetName="FocusChrome" Property="Opacity" Value="0.38" /></Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

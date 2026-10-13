@@ -194,7 +194,7 @@
                                             </Grid>
                                         </StackPanel>
                                         <Border x:Name="ColorPreview" Grid.Column="2" Margin="0,22,0,0" Height="52" VerticalAlignment="Top" CornerRadius="9" Background="#FF7800"
-                                                BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2">
+                                                BorderBrush="{DynamicResource AccentTextBrush}" BorderThickness="2">
                                             <Border.Effect><DropShadowEffect x:Name="PreviewGlow" Color="#FF7800" BlurRadius="13" ShadowDepth="0" Opacity="0.42" /></Border.Effect>
                                         </Border>
                                     </Grid>
@@ -216,7 +216,7 @@
 
                                     <Grid Grid.Row="4">
                                         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="5" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                        <Grid><TextBlock Text="Brightness" FontSize="15" FontWeight="SemiBold" /><TextBlock x:Name="BrightnessText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
+                                        <Grid><TextBlock Text="Brightness" FontSize="15" FontWeight="SemiBold" /><TextBlock x:Name="BrightnessText" Text="100%" Foreground="{DynamicResource AccentTextBrush}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" /></Grid>
                                         <Grid Grid.Row="2">
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="28" /><ColumnDefinition Width="*" /><ColumnDefinition Width="28" /></Grid.ColumnDefinitions>
                                             <TextBlock Text="☼" Foreground="{StaticResource SecondaryTextBrush}" FontSize="17" VerticalAlignment="Center" />
@@ -250,7 +250,7 @@
                                             </Grid.RowDefinitions>
                                             <Grid>
                                                 <TextBlock Text="Speed" FontSize="15" FontWeight="SemiBold" />
-                                                <TextBlock x:Name="EffectSpeedText" Text="50%" Foreground="{DynamicResource AccentBrush}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                                <TextBlock x:Name="EffectSpeedText" Text="50%" Foreground="{DynamicResource AccentTextBrush}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                             </Grid>
                                             <Grid Grid.Row="2">
                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -266,12 +266,19 @@
                         </Border>
 
                         <Grid Grid.Row="2">
-                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="8" /><RowDefinition Height="76" /></Grid.RowDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="8" /><RowDefinition Height="Auto" MinHeight="76" /></Grid.RowDefinitions>
                             <Grid>
-                                <TextBlock Text="Presets" FontSize="16" FontWeight="SemiBold" Margin="16,0,0,0" />
+                                <StackPanel Orientation="Horizontal" Margin="16,0,0,0">
+                                    <TextBlock Text="Presets" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <!-- Always visible, unlike the end of the scrolling preset strip. -->
+                                    <Button x:Name="RandomColorButton" Margin="14,0,0,0" Height="28" Padding="10,0" Style="{StaticResource PremiumButton}" BorderBrush="#505050"
+                                            Click="RandomColorButton_Click" ToolTip="Pick a random vivid color" AutomationProperties.Name="Random color">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8B1;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" Margin="0,0,7,0" /><TextBlock Text="Random" FontSize="12.5" VerticalAlignment="Center" /></StackPanel>
+                                    </Button>
+                                </StackPanel>
                                 <TextBlock x:Name="PresetHintText" Text="Changes save with Apply" Foreground="{StaticResource MutedBrush}" FontSize="11.5" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
-                            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="0,0,3,0">
+                            <ScrollViewer x:Name="PresetScrollViewer" Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="0,0,3,0" PreviewMouseWheel="PresetScrollViewer_PreviewMouseWheel">
                                 <ScrollViewer.Resources>
                                     <Style TargetType="ScrollBar">
                                         <Setter Property="Height" Value="7" />
@@ -308,7 +315,7 @@
                                                         <Button Tag="{Binding}" Click="PresetCard_Click" Style="{StaticResource PremiumButton}" Background="Transparent" BorderThickness="0" Padding="10,7" HorizontalContentAlignment="Stretch">
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                                                <Ellipse Width="23" Height="23" Fill="{Binding Hex}" VerticalAlignment="Center" />
+                                                                <Ellipse Width="23" Height="23" Fill="{Binding Hex}" Stroke="#5A5A5A" StrokeThickness="1" VerticalAlignment="Center" />
                                                                 <StackPanel Grid.Column="1" Margin="7,0,0,0" VerticalAlignment="Center">
                                                                     <TextBlock Text="{Binding DisplayName}" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                                     <TextBlock Text="{Binding Brightness, StringFormat={}{0}%}" Foreground="{StaticResource SecondaryTextBrush}" FontSize="11" Margin="0,3,0,0" />
@@ -323,7 +330,7 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                     <Button x:Name="AddPresetButton" Width="132" Height="64" Style="{StaticResource PremiumButton}" Background="Transparent" BorderBrush="#505050" BorderThickness="1" Padding="8" Click="AddPresetButton_Click">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><TextBlock Text="+" FontSize="24" Foreground="{DynamicResource AccentBrush}" Margin="0,-2,8,0" /><TextBlock Text="Add Preset" VerticalAlignment="Center" FontSize="13" /></StackPanel>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><TextBlock Text="+" FontSize="24" Foreground="{DynamicResource AccentTextBrush}" Margin="0,-2,8,0" /><TextBlock Text="Add Preset" VerticalAlignment="Center" FontSize="13" /></StackPanel>
                                     </Button>
                                 </StackPanel>
                             </ScrollViewer>
@@ -332,7 +339,7 @@
                         <Grid Grid.Row="4">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="1*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="1.05*" /></Grid.ColumnDefinitions>
                             <Button x:Name="ApplyButton" Style="{StaticResource AccentButton}" Click="ApplyButton_Click" IsEnabled="False">
-                                <StackPanel Orientation="Horizontal"><Border Width="30" Height="30" BorderBrush="White" BorderThickness="2" CornerRadius="15" Margin="0,0,14,0"><TextBlock Text="✓" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><TextBlock x:Name="ApplyButtonText" Text="Apply" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" /></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Border Width="30" Height="30" BorderBrush="{DynamicResource AccentForegroundBrush}" BorderThickness="2" CornerRadius="15" Margin="0,0,14,0"><TextBlock Text="✓" Foreground="{DynamicResource AccentForegroundBrush}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><TextBlock x:Name="ApplyButtonText" Foreground="{DynamicResource AccentForegroundBrush}" Text="Apply" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" /></StackPanel>
                             </Button>
                             <Button x:Name="StopButton" Grid.Column="2" Style="{StaticResource PremiumButton}" FontSize="20" Click="StopButton_Click" IsEnabled="False" Background="#151515">
                                 <StackPanel Orientation="Horizontal"><Border Width="30" Height="30" BorderBrush="White" BorderThickness="2" CornerRadius="15" Margin="0,0,14,0"><Rectangle Width="11" Height="11" Fill="White" RadiusX="2" RadiusY="2" /></Border><TextBlock Text="Stop" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" /></StackPanel>
@@ -377,11 +384,11 @@
                         </Border>
                         <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button x:Name="FirmwareSetupButton" Style="{StaticResource PremiumButton}" Background="#FF7800" BorderThickness="0" Padding="12,5" Margin="0,0,12,0" Click="FirmwareSetupButton_Click" Visibility="Collapsed">
-                                <TextBlock Text="Enable RGB Control" Foreground="White" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Text="Enable RGB Control" Foreground="Black" FontSize="13" FontWeight="SemiBold" />
                             </Button>
                             <TextBlock Text="Having issues?" Foreground="{StaticResource MutedBrush}" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,14,0" />
                             <Button x:Name="FooterReconnectButton" Style="{StaticResource PremiumButton}" Background="Transparent" BorderThickness="0" Padding="4" Click="ReconnectButton_Click">
-                                <TextBlock Text="Reconnect  ›" Foreground="{DynamicResource AccentBrush}" FontSize="13.5" FontWeight="SemiBold" />
+                                <TextBlock Text="Reconnect  ›" Foreground="{DynamicResource AccentTextBrush}" FontSize="13.5" FontWeight="SemiBold" />
                             </Button>
                         </StackPanel>
                     </Grid>

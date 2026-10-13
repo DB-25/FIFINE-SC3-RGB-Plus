@@ -1355,7 +1355,7 @@ public partial class MainWindow : Window
                 (!string.Equals(preset.Hex, CurrentHex, StringComparison.OrdinalIgnoreCase) || preset.Brightness != CurrentBrightness);
         }
 
-        AddPresetButton.BorderBrush = _isAddingPreset ? new SolidColorBrush(_selectedColor) : new SolidColorBrush(Color.FromRgb(80, 80, 80));
+        AddPresetButton.BorderBrush = _isAddingPreset ? new SolidColorBrush(ColorText.VisibleOnDark(_selectedColor)) : new SolidColorBrush(Color.FromRgb(80, 80, 80));
         AddPresetButton.BorderThickness = _isAddingPreset ? new Thickness(2) : new Thickness(1);
         PresetHintText.Text = _isAddingPreset ? "New preset ready · choose Apply to save" :
             selected?.IsDirty == true ? "Unsaved changes · choose Apply to save" : "Changes save with Apply";
@@ -1364,18 +1364,81 @@ public partial class MainWindow : Window
     private void EnsureEditablePresets()
     {
         _settings.Presets ??= [];
-        if (_settings.PresetsInitialized) return;
+        if (!_settings.PresetsInitialized)
+        {
+            _settings.Presets = StarterPresets.Select((s, i) => CreateStarter(s.Name, s.Hex, 100, i)).ToList();
+            _settings.PresetsInitialized = true;
+            _settings.StarterPresetsVersion = StarterPresetsVersion;
+            return;
+        }
 
-        _settings.Presets =
-        [
-            CreateStarter("White", "#FFFFFF", 100, 0),
-            CreateStarter("Red", "#FF0000", 100, 1),
-            CreateStarter("Green", "#00FF00", 100, 2),
-            CreateStarter("Blue", "#0000FF", 100, 3),
-            CreateStarter("Orange", "#FF7800", 100, 4),
-            CreateStarter("Purple", "#9D00FF", 100, 5)
-        ];
-        _settings.PresetsInitialized = true;
+        // Existing users: append starters added in later versions once, skipping
+        // colors they already have and never re-adding ones they deleted before.
+        if (_settings.StarterPresetsVersion >= StarterPresetsVersion) return;
+        int order = _settings.Presets.Count == 0 ? 0 : _settings.Presets.Max(p => p.Order) + 1;
+        foreach ((string name, string hex, int version) in StarterPresets)
+        {
+            if (version <= _settings.StarterPresetsVersion || version == 1) continue;
+            if (_settings.Presets.Any(p => string.Equals(p.Hex, hex, StringComparison.OrdinalIgnoreCase))) continue;
+            _settings.Presets.Add(CreateStarter(name, hex, 100, order++));
+        }
+        _settings.StarterPresetsVersion = StarterPresetsVersion;
+    }
+
+    private const int StarterPresetsVersion = 2;
+
+    private static readonly (string Name, string Hex, int Version)[] StarterPresets =
+    [
+        ("White", "#FFFFFF", 1),
+        ("Red", "#FF0000", 1),
+        ("Green", "#00FF00", 1),
+        ("Blue", "#0000FF", 1),
+        ("Orange", "#FF7800", 1),
+        ("Purple", "#9D00FF", 1),
+        ("Warm White", "#FFB46B", 2),
+        ("Yellow", "#FFD000", 2),
+        ("Lime", "#A6FF00", 2),
+        ("Teal", "#00C2A8", 2),
+        ("Cyan", "#00FFFF", 2),
+        ("Ice Blue", "#6EC8FF", 2),
+        ("Magenta", "#FF00FF", 2),
+        ("Pink", "#FF2D95", 2)
+    ];
+
+    // The preset strip only scrolls horizontally; map the mouse wheel onto it.
+    private void PresetScrollViewer_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if (PresetScrollViewer.ScrollableWidth <= 0) return;
+        PresetScrollViewer.ScrollToHorizontalOffset(PresetScrollViewer.HorizontalOffset - e.Delta);
+        e.Handled = true;
+    }
+
+    private void RandomColorButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Vivid, fully bright colors read best on the mixer LEDs; keep the new
+        // hue at least 40° from the current one so each click visibly changes.
+        double currentHue = HueOf(_selectedColor);
+        double hue;
+        do hue = Random.Shared.NextDouble() * 360;
+        while (Math.Abs(((hue - currentHue + 540) % 360) - 180) < 40);
+        Color color = UI.Controls.HsvColorPicker.ColorFromHsv(hue, 0.75 + Random.Shared.NextDouble() * 0.25, 1);
+
+        _isAddingPreset = false;
+        _selectedPresetId = null;
+        _settings.SelectedPresetId = null;
+        SetSelectedColor(color, true);
+        RefreshPresetVisualState();
+        PresetHintText.Text = $"Random {CurrentHex} · Add Preset to keep it";
+        QueueSettingsSave();
+    }
+
+    private static double HueOf(Color color)
+    {
+        double r = color.R / 255.0, g = color.G / 255.0, b = color.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b)), delta = max - Math.Min(r, Math.Min(g, b));
+        if (delta == 0) return 0;
+        double hue = max == r ? (g - b) / delta % 6 : max == g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+        return (hue * 60 + 360) % 360;
     }
 
     private static ColorPreset CreateStarter(string name, string hex, int brightness, int order) => new()
@@ -1443,6 +1506,8 @@ public partial class MainWindow : Window
     private void UpdateDynamicAccent(Color color)
     {
         Application.Current.Resources["AccentBrush"] = new SolidColorBrush(color);
+        Application.Current.Resources["AccentForegroundBrush"] = new SolidColorBrush(ColorText.ForegroundOn(color));
+        Application.Current.Resources["AccentTextBrush"] = new SolidColorBrush(ColorText.VisibleOnDark(color));
         PreviewGlow.Color = color;
         RefreshEffectVisualState();
         UpdateMixerPreview();
@@ -1452,7 +1517,7 @@ public partial class MainWindow : Window
     {
         if (StaticEffectButton is null) return;
 
-        Color borderColor = _selectedColor;
+        Color borderColor = ColorText.VisibleOnDark(_selectedColor);
         SolidColorBrush selectedBrush = new(borderColor);
         SolidColorBrush idleBrush = new(Color.FromRgb(52, 52, 52));
         foreach ((Button button, LightingEffect effect) in new[]
